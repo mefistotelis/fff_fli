@@ -1,20 +1,18 @@
-PL:
-Skopiuj wybrany plik palety do FLIFix.PAL
-Uruchom program FLIFIX.EXE podaj¥c jako parametr
-  plik do poprawienia
-Plik wynikowy b©dzie nazywaˆ si© Repaired.FLI
+I have written this tool to decode FLI files
+from a game Syndicate Wars (Bullfrog 1996).
+The files had modified format, so I coudn't
+read them in FLI player.
 
+This program fixes all headers, but animation data
+is not changed.
+It means that after using this tool,
+there is still a chanse that file has errors.
 
--Ta wersja FLIFIX nie dziaˆa z Syndicate 1
--Dziaˆa do wszystkich plik¢w Syndicate Wars
--Dla innych FLI mo¾e nie dziaˆa† przy du¾ym pliku (>1MB)
+No warranty (bla bla bla)
 
-EN:
-Copy a chosen palette file to FLIFix.PAL
-Run FLIFIX.EXE with a chosen file as parameter
-The output file name is Repaired.FLI
+I will distribute this tool with source.
+Ideas? (I dot't think anyone is intrested in fixing old FLIcs):
 
-- This version do not support Syndicate 1
-- It supports all files in Syndicate Wars
-- On other FLI files, there may ba a problem if filesize
-  exceeds 1MB
+mefistotelis@gmail.com
+
+(no, there is no typo)

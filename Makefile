@@ -1,4 +1,4 @@
-﻿CPP  = g++
+CPP  = g++
 CC   = gcc
 WINDRES = windres
 DLLTOOL = dlltool
@@ -18,10 +18,10 @@ LDFLAGS=
 
 .PHONY: all all-before all-after clean clean-custom
 
+all: all-before $(BIN) all-after
+
 clean: clean-custom
 	-${RM} $(OBJS) $(BIN) $(LIBS)
-
-all: all-before $(BIN) all-after
 
 all-before:
 	$(MKDIR) obj bin

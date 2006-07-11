@@ -47,12 +47,14 @@ typedef struct
      unsigned int reserved2[20];
   } FLIAddHeader;
 
+const ulong FLIFrameExpandSize=4;
+
 typedef struct
   {
      ulong size;
      unsigned int magic;
      unsigned int chunks;
-     unsigned int expand[4];
+     unsigned int expand[FLIFrameExpandSize];
   } FLIFrameHeader;
 
 typedef struct
@@ -63,13 +65,28 @@ typedef struct
 
 typedef struct
   {
-     unsigned int val1;
-     unsigned int val2;
-  } FLIColor256Header;
+     unsigned int nPackets;
+  } FLIColorHeader;
+
+typedef struct
+  {
+     unsigned char nSkipColors;
+     unsigned char nChangeColors; //If this number is 0,  (zero), it means 256
+  } FLIColorPacketHeader;
+
+typedef struct
+  {
+     unsigned char Red;
+     unsigned char Green;
+     unsigned char Blue;
+  } ColorDefinition;
+
+const ulong MaxPalSize=sizeof(FLIChunkHeader)+sizeof(FLIColorHeader)+6*sizeof(FLIColorPacketHeader)+256*sizeof(ColorDefinition);
+
 
 //Funkcje
 char *GetChunkTypeStr(int iType);
-void DisplayHeaderInfo(FLIMainHeader *AnimHeader,FLIAddHeader *AnimAddHeader,ulong HStart,ulong HEnd, ulong FSize);
+void DisplayAddHeaderInfo(FLIAddHeader *AnimAddHeader,ulong HEnd);
 void DisplayFrameInfo(FLIFrameHeader *CurrFrameHdr,ulong FrameNumber,ulong TotalFrames,ulong HStart,ulong HEnd);
 void DisplayChunkInfo(FLIChunkHeader *CurrChunkHdr,ulong ChunkNumber,ulong HStart);
 
@@ -84,8 +101,8 @@ void LoadFrameHeader(int AnimFile,FLIFrameHeader *AnimFrameHdr,ulong StartOffset
 void LoadChunkHeader(int AnimFile,FLIChunkHeader *AnimChunkHdr,ulong StartOffset,ulong ChunkNumber,int Options);
 void LoadChunkData(int AnimFile,void *AnimChunkData,ulong Size,int Options);
 
-int ValidChunk(FLIChunkHeader *AnimChunkHdr);
-int ValidFrame(FLIFrameHeader *AnimFrameHdr);
+int ValidChunk(FLIChunkHeader *AnimChunkHdr,ulong);
+int ValidFrame(FLIFrameHeader *AnimFrameHdr,ulong);
 void FixMainHeader(FLIMainHeader *AnimHeaderSrc,FLIAddHeader *AnimAddHeaderSrc,FLIMainHeader *AnimHeaderDest,FLIAddHeader *AnimAddHeaderDest,ulong FSize,int Options);
 void FixFrameHeader(FLIFrameHeader *AnimFrameHdr,ulong FramePos,ulong FrameEnd,int Options);
 

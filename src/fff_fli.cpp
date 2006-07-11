@@ -15,8 +15,9 @@ char *DestFName="repaired.fli";
 
 void SayHello()
 {
-  printf("This program can repair damaged or modified FLI files.\n");
+  printf("\nThis program can repair damaged or modified FLI files.\n");
   printf("Repaired file is saved as '%s'\n",DestFName);
+  printf("%20s (c) by Tomasz Lis, Gdaäsk, Poland 2004\n\n","");
 }
 
 void OpenFLIFile(char *FName,int &File,int Mode)
@@ -27,7 +28,7 @@ void OpenFLIFile(char *FName,int &File,int Mode)
 
 void WaitForKeypress(int &Options)
 {
-  if (Options & poDisplayAllInfo)
+  if ((Options & poDisplayAllInfo)&&(!(Options & poNeverWaitForKey)))
     {
     printf("\n (Press any key to continue, Q quits, ESC stops holding)\n");
     char X=getch();
@@ -41,91 +42,62 @@ void CloseFLIFiles(int &AnimFile,int &DestFile)
   printf("-------- Analyst complete - all frames has been processed ---------\n");
   close(AnimFile);
   close(DestFile);
-  printf("\n (Press any key to leave program)");
-  getch();
+  if (!(Options & poNeverWaitForKey))
+    {
+    printf("\n (Press any key to leave program)");
+    getch();
+    };
   printf("\n");
 }
 
 void AskToDisplayInfo(int &Options)
 {
-  printf(" (Press ENTER to display additional informations)\n");
-  printf(" (Other key cancels full displaying)\n");
-  char X=getch();
-  if (X==kbEnter) Options|=poDisplayAllInfo; else Options&=(0xffff-poDisplayAllInfo);
+  if (!(Options & poNeverWaitForKey))
+    {
+    printf(" (Press ENTER to display additional informations)\n");
+    printf(" (Other key cancels full displaying)\n");
+    char X=getch();
+    if (X==kbEnter) Options|=poDisplayAllInfo; else Options&=(0xffff-poDisplayAllInfo);
+    };
 }
 
-void SaveData(void *BufDest,ulong Size,int DestFile)
+int ProcessMainHeader(int AnimFile,int DestFile,FLIMainHeader *AnimHeaderDest,int &Options)
 {
-  ulong nWritten=write(DestFile,BufDest,Size);
-  if (nWritten<Size) ShowError(errFileWrite+errCritical,strerror(errno));
-}
-
-int ProcessMainHeader(int AnimFile,int DestFile,ulong &FrameCount,int Options)
-{
-  void *BufSrc=NULL;
-  void *BufDest=NULL;
+  //Zmienne lokalne
   ulong Increment=sizeof(FLIMainHeader);
-  BufSrc=malloc(sizeof(FLIMainHeader)+sizeof(FLIAddHeader)+2);
-  BufDest=malloc(sizeof(FLIMainHeader)+sizeof(FLIAddHeader)+2);
-  if ((BufSrc==NULL)||(BufDest==NULL)) ShowError(errCritical|errMainHdr|errMemAlloc,"Cannot allocate memory for main header. Try reboot your machine.");
-  FLIMainHeader *AnimHeaderSrc=(FLIMainHeader *)BufSrc;
-  FLIAddHeader *AnimAddHeaderSrc=(FLIAddHeader *)((ulong)(BufSrc)+sizeof(FLIMainHeader));
-  FLIMainHeader *AnimHeaderDest=(FLIMainHeader *)BufDest;
-  FLIAddHeader *AnimAddHeaderDest=(FLIAddHeader *)((ulong)(BufDest)+sizeof(FLIMainHeader));
   ulong StartPos=tell(AnimFile);
-  //Deklarujemy, czytamy i wyswietlamy nagˆ¢wek
+
+  //Allokujemy pami©† na nagˆ¢wek
+  FLIMainHeader *AnimHeaderSrc=(FLIMainHeader *)AllocateMem(sizeof(FLIMainHeader)+1,errCritical|errMainHdr,Options);
+  FLIAddHeader *AnimAddHeaderSrc=(FLIAddHeader *)AllocateMem(sizeof(FLIAddHeader)+1,errCritical|errAddHdr,Options);
+  //Czytamy nagˆ¢wek
   LoadMainHeader(AnimHeaderSrc,AnimAddHeaderSrc,AnimFile,Options);
+
+  //Tworzymy poprawion¥ kopie nagˆ¢wk¢w
+  FLIAddHeader *AnimAddHeaderDest=(FLIAddHeader *)AllocateMem(sizeof(FLIAddHeader)+1,errCritical|errAddHdr,Options);
   FixMainHeader(AnimHeaderSrc,AnimAddHeaderSrc,AnimHeaderDest,AnimAddHeaderDest,filelength(AnimFile),Options);
-  DisplayHeaderInfo(AnimHeaderSrc,AnimAddHeaderSrc,StartPos,tell(AnimFile)-1,filelength(AnimFile));
+
+  //Wy˜wietlamy informacje o nagˆ¢wkach
+  DisplayMainHeaderInfo(AnimHeaderSrc,StartPos,filelength(AnimFile));
+  AskToDisplayInfo(Options);
+  if (Options & poDisplayAllInfo)
+    DisplayAddHeaderInfo(AnimAddHeaderSrc,tell(AnimFile)-1);
+
+  //Zapisujemy nagˆ¢wki
+  SaveDataToFile(AnimHeaderDest,sizeof(FLIMainHeader),DestFile);
+  SaveDataToFile(AnimAddHeaderDest,sizeof(FLIAddHeader),DestFile);
+
+  //Aktualizujemy zmienne wyj˜ciowe
   if (HasAddHeader(AnimHeaderSrc))
     Increment+=sizeof(FLIAddHeader);
-  SaveData(BufDest,sizeof(FLIMainHeader)+sizeof(FLIAddHeader),DestFile);
-  FrameCount=AnimHeaderDest->frames;
-  free(BufSrc);
-  free(BufDest);
+
+  //Pozostaje zwolnienie pami©ci
+  free(AnimHeaderSrc);
+  free(AnimAddHeaderSrc);
+  free(AnimAddHeaderDest);
+
   return Increment;
 }
-
-void FixFrameHdrToAddChunks(FLIFrameHeader *AnimFrameHdr,ulong FrameNum,int Options)
-{
-  if ((Options & poRecostructPatette)&&(FrameNum==1))
-    {
-    AnimFrameHdr->size+=256*3+sizeof(FLIChunkHeader)+4;
-    AnimFrameHdr->chunks++;
-    };
-}
-
-void AddRequiredChunksAtFrameStart(int DestFile,ulong FrameNumber,int Options)
-{
-//Ta funkcja tylko zapisuje chunksa. Modyfikacja nagˆ¢wka nale¾y do FixFrameHdrToAddChunks
-  if ((Options & poRecostructPatette)&&(FrameNumber==1))
-    {
-    ulong PalSize=3*256;
-    FLIChunkHeader *PalChkHdr=(FLIChunkHeader *)malloc(sizeof(FLIChunkHeader)+1);
-    FLIColor256Header *PalPalChkHdr=(FLIColor256Header *)malloc(sizeof(FLIColor256Header)+1);
-    void *PalChkData=malloc(PalSize+1);
-    if ((PalChkHdr==NULL)||(PalPalChkHdr==NULL)||(PalChkData==NULL))
-      {
-      ShowError(errChunkData|errMemAlloc,"Cannot allocate memory for additional palette chunk. Output file will have errors.");
-      return;
-      };
-    ClearFLIChunkHdr(PalChkHdr);
-    ClearNBufferBytes((char *)PalPalChkHdr,sizeof(FLIColor256Header));
-    PalChkHdr->size=PalSize+sizeof(FLIChunkHeader)+sizeof(FLIColor256Header);
-    PalChkHdr->type=FLI_COLOR256;
-    PalPalChkHdr->val1=1;
-
-    SaveData(PalChkHdr,sizeof(FLIChunkHeader),DestFile);
-    free(PalChkHdr);
-    SaveData(PalPalChkHdr,sizeof(FLIColor256Header),DestFile);
-    free(PalPalChkHdr);
-
-    LoadPalette("FLIFix.pal",PalChkData,PalSize,Options);
-    SaveData(PalChkData,PalSize,DestFile);
-    free(PalChkData);
-    };
-}
-
 
 ulong ProcessFrame(int AnimFile,int DestFile,FLIFrameHeader *AnimFrameHdr,ulong FramePos,ulong FrameEnd,ulong FrameNum,ulong TotalFrames,int Options)
 {
@@ -134,139 +106,377 @@ ulong ProcessFrame(int AnimFile,int DestFile,FLIFrameHeader *AnimFrameHdr,ulong 
   FixFrameHeader(AnimFrameHdr,FramePos,FrameEnd,Options);
 
   //Robimy kopi© nagˆ¢wna pod nazw¥ DestFrameHdr
-  FLIFrameHeader *DestFrameHdr=(FLIFrameHeader *)malloc(sizeof(FLIFrameHeader)+1);
-  if (DestFrameHdr==NULL) ShowError(errCritical|errFrameHdr|errMemAlloc,"Cannot allocate memory for frame header. Try reboot.");
+  FLIFrameHeader *DestFrameHdr=(FLIFrameHeader *)AllocateMem(sizeof(FLIFrameHeader)+1,errCritical|errFrameHdr,Options);
   memmove(DestFrameHdr,AnimFrameHdr,sizeof(FLIFrameHeader));
 
   //Zapisujemy t¥ kopi© - po drobnych modyfikacjach
   FixFrameHdrToAddChunks(DestFrameHdr,FrameNum,Options);
-  SaveData(DestFrameHdr,sizeof(FLIFrameHeader),DestFile);
+  SaveDataToFile(DestFrameHdr,sizeof(FLIFrameHeader),DestFile);
   AddRequiredChunksAtFrameStart(DestFile,FrameNum,Options);
   free(DestFrameHdr);
   return Increment;
 }
 
-void FillFramePosTable(ulong *FramePosTable,int AnimFile,ulong FrameCount,int Options)
+long PosInFrameTable(ulong Offset,ulong *FramePosTable,ulong TableSize)
 {
-  ulong Offset=tell(AnimFile);
-  FLIFrameHeader *AnimFrameHdr=(FLIFrameHeader *)malloc(sizeof(FLIFrameHeader)+1);
-  if (AnimFrameHdr==NULL) ShowError(errCritical|errFrameHdr|errMemAlloc,"Cannot allocate memory for frame header required to create Frame Position Table. Try reboot.");
-  for (ulong n=0;n<=FrameCount;n++)
+  ulong ElemPos=0;
+  while ((ElemPos<TableSize)&&(FramePosTable[ElemPos]<Offset))
+    ElemPos++;
+  //Sprawdzamy czy klatki nie ma ju¾ w tablicy
+  if (FramePosTable[ElemPos]==Offset)
+    return ElemPos;
+   else
+    return -1;
+}
+
+long InsertFrameToTable(ulong *&FramePosTable,unsigned int FrameCount,ulong &FoundedFrames,ulong Offset)
+{
+  //Znajdujemy pozycj© do wstawienia nowej klatki
+  ulong InsertPos=0;
+  while ((InsertPos<FoundedFrames)&&(FramePosTable[InsertPos]<Offset))
     {
-    //Szukamy offsetu na kt¢rym jest FrameHeader
-    signed long delta=0;
-    signed long lastDelta;
-    do
-      {
-      lastDelta=delta;
-      //delta ma by† ci¥giem: 0 -1 1 -2 2 -3 3 ....
-      if (delta>=0)
-        { delta++; delta*=(-1); }
-       else
-        { delta*=(-1); };
-      //Dla kolejnych delt pr¢bujemy wczytywa† FrameHeader
-      if (((Offset-delta)>(sizeof(FLIMainHeader)-2)) && ((Offset-delta)<(filelength(AnimFile)-sizeof(FLIFrameHeader)+2)))
-        LoadFrameHeader(AnimFile,AnimFrameHdr,Offset+lastDelta,n+1,FrameCount,(Options & (0xffff - poDisplayAllInfo)) | poIgnoreExceptions);
-       else
-        ClearFLIFrameHdr(AnimFrameHdr);
-      }
-     while ((!ValidFrame(AnimFrameHdr))&&(delta<65535));
-    //Tu mamy kandydata na Framea - mo¾emy go zaakceptowa† lub nie
-    if (ValidFrame(AnimFrameHdr))
-      {
-      if ((n>0)&&((Offset+lastDelta)<FramePosTable[n-1]))
-        FramePosTable[n]=Offset;
-       else
-        FramePosTable[n]=Offset+lastDelta;
-      }
-     else
-      FramePosTable[n]=Offset;
-    //Ustawili˜my offset Frame'a. Trzeba sie jeszcze przygotowac do kolejnych poszukiwaä
-/*
-    printf(">FillFramePosTable< Klatka %lu, offset wejsciowy %lu, delta %lu \n",n,Offset,lastDelta);
-    getch();
-*/
-    LoadFrameHeader(AnimFile,AnimFrameHdr,FramePosTable[n],n+1,FrameCount,(Options & (0xffff - poDisplayAllInfo)) | poIgnoreExceptions);
-    Offset=FramePosTable[n]+AnimFrameHdr->size;
+    InsertPos++;
     };
-  FramePosTable[FrameCount+1]=filelength(AnimFile);
+  //Sprawdzamy czy klatki nie ma ju¾ w tablicy
+  if (FramePosTable[InsertPos]==Offset)
+    {
+    return 0;
+    };
+  //Je¾eli tablica jest caˆa peˆna, musimy przeallokowa† pami©†
+  if (FoundedFrames>FrameCount)
+    {
+    return -1;//Na razie tego nie robi© - powinno nie by† potrzebne
+    };
+  //Przenosimy o jedno pole wszystkie elementy za miejscem wstawienia wˆ¥cznie
+  for (long i=FrameCount+1;i>=(long)InsertPos;i--)
+    {
+//printf("Przenosz© el. %li by wstawi† na poz. %lu\n",i,InsertPos);
+    FramePosTable[i+1]=FramePosTable[i];
+    };
+  //I wstawiamy nasz¥ klatk© w utworzone miejsce
+  FramePosTable[InsertPos]=Offset;
+  //Oczywi˜cie ilo˜† klatek wzrosˆa
+  FoundedFrames++;
+  return InsertPos+1;
+}
+
+const long deltaRange=65535;
+
+void FindLostFrames(ulong *&FramePosTable,int AnimFile,unsigned int FrameCount,ulong &FoundedFrames,ulong FullFrameSize,int Options)
+{
+  printf("    Some frames are missing. Parsing whole source file...\n");
+  //Przygotowujemy bufory
+  ulong BufSize=sizeof(FLIFrameHeader)+sizeof(FLIChunkHeader);
+  void *Buf=AllocateMem(BufSize+1,errFrameHdr|errOnlyParsing,Options);
+  if (Buf==NULL) return;
+  FLIFrameHeader *FrameHdr=(FLIFrameHeader *)&(((char *)Buf)[0]);
+  FLIChunkHeader *ChunkHdr=(FLIChunkHeader *)&(((char *)Buf)[sizeof(FLIFrameHeader)]);
+  //Przegl¥damy kolejne offsety w poszukiwaniu klatek
+  for (ulong Offset=0;Offset<=(filelength(AnimFile)-BufSize);Offset++)
+    {
+    //Wczytujemy nagˆ¢wki
+    lseek(AnimFile,Offset ,SEEK_SET);
+    if (!LoadDataFromFile(AnimFile,Buf,BufSize,errFrameHdr|errOnlyParsing,Options))
+      {
+      free(Buf);
+      return;
+      };
+    //Sprawdzamy czy nagˆ¢wki pasuj¥ do wygl¥du klatek
+    if (StrictValidFrame(FrameHdr,FullFrameSize+2*MaxPalSize+sizeof(FLIFrameHeader)+3*sizeof(FLIChunkHeader)))
+      {
+      if ((FrameHdr->chunks==0) || ((FrameHdr->chunks>0) && ValidChunk(ChunkHdr,FullFrameSize+sizeof(FLIChunkHeader))) )
+        {
+        if (Options & poDisplayAllInfo)
+          printf("    ->Founded valid frame at %9lu, ",Offset);
+        long InsResult=InsertFrameToTable(FramePosTable,FrameCount,FoundedFrames,Offset);
+        if (Options & poDisplayAllInfo)
+          {
+          if (InsResult>0)  printf("added to frame table as frame %li.\n",InsResult);
+          if (InsResult==0) printf("already is in frame table.\n");
+          if (InsResult<0)  printf("cannot add, frame table full.\n");
+          };
+        };
+      };//end if (StrictValidFrame(...
+    };//end for (ulong Offset...
+  printf("    After searching, we have %lu frames (the file informed of %u frames)\n",FoundedFrames,FrameCount+1);
+  free(Buf);
+}
+
+enum BestFrameChoise
+  {
+   cbfOldOffset,
+   cbfFixedOffset,
+   cbfNothing
+  };
+
+ulong FindBestPosition(ulong *FramePosTable,int AnimFile,ulong lastFrame,ulong foundedFrames,ulong Offset,int ParseOptions)
+{
+  signed long delta;
+  signed long newDelta=0;
+  int FrameIsValid=0;
+  ulong NewOffset;
+  FLIFrameHeader *AnimFrameHdr=(FLIFrameHeader *)AllocateMem(sizeof(FLIFrameHeader)+1,errCritical|errFrameHdr,Options);
+      do
+	{
+	delta=newDelta;
+	//delta ma by† ci¥giem: 0 -1 1 -2 2 -3 3 ....
+	if (newDelta>=0)
+	  { newDelta++; newDelta*=(-1); }
+	 else
+	  { newDelta*=(-1); };
+	//Dla kolejnych delt pr¢bujemy wczytywa† FrameHeader
+	//Nie ma wi©kszego znaczenia czy b©dziemy tu por¢wnywa† (Offset-Delta) czy (Offset+Delta)
+	NewOffset=Offset+delta;
+	if ( (NewOffset>(sizeof(FLIMainHeader)-2)) && (NewOffset<=(filelength(AnimFile)-sizeof(FLIFrameHeader))) )
+	  LoadFrameHeader(AnimFile,AnimFrameHdr,NewOffset,foundedFrames+1,0,ParseOptions);
+	 else
+	  ClearFLIFrameHdr(AnimFrameHdr);
+//if ((delta>0)&&((delta%20000)==0)) printf("Problemy ze znalezieniem klatki %lu z pozycji %lu\n",foundedFrames+1,Offset);
+        FrameIsValid=ValidFrame(AnimFrameHdr,filelength(AnimFile)-FramePosTable[lastFrame]);
+	if ((FrameIsValid)&&(PosInFrameTable(NewOffset,FramePosTable,foundedFrames)<0))
+          {
+          free(AnimFrameHdr);
+          return NewOffset;
+          };
+	}
+       while ((delta<deltaRange));
+  free(AnimFrameHdr);
+  return Offset;
+}
+
+int ChooseBestFrame(int AnimFile,ulong MaxFrameSize,ulong Offset,ulong NewOffset,int Options)
+/*
+ Zwraca    cbfOldOffset, cbfFixedOffset lub  cbfNothing
+*/
+{
+  //Bufory na obydwie klatki
+  FLIFrameHeader *NewFrameHdr=(FLIFrameHeader *)AllocateMem(sizeof(FLIFrameHeader)+1,errCritical|errFrameHdr|errOnlyParsing,Options);
+  FLIFrameHeader *OldFrameHdr=(FLIFrameHeader *)AllocateMem(sizeof(FLIFrameHeader)+1,errCritical|errFrameHdr|errOnlyParsing,Options);
+  //Ustawienia wst©pne zmiennych
+  int AllowOld=1;
+  int AllowFix=1;
+  int AllowNot=1;
+  //adujemy klatki
+  LoadFrameHeader(AnimFile,NewFrameHdr,NewOffset,0,0,Options);
+  LoadFrameHeader(AnimFile,OldFrameHdr,   Offset,0,0,Options);
+  //i robimy testy - najpierw proste
+  if (Options & poNeverSkipFrames)
+    AllowNot=0;
+  if ((Offset==NewOffset)||(!(Options & poFixFramePositions)))
+    AllowFix=0;
+  if (!ValidFrame(NewFrameHdr,MaxFrameSize))
+    AllowFix=0;
+  if (AllowFix||AllowNot)
+    if (!ValidFrame(OldFrameHdr,MaxFrameSize))
+      AllowOld=0;
+  //Je˜li si© nie rozwi¥zaˆo, trzeba mu bardziej dowali†
+  if (AllowOld||AllowNot)
+    if (NewOffset>filelength(AnimFile)-sizeof(FLIFrameHeader))
+      AllowFix=0;
+  if (AllowFix||AllowNot)
+    if (Offset>filelength(AnimFile)-sizeof(FLIFrameHeader))
+      AllowOld=0;
+  if (AllowFix||AllowOld)
+    if (ValidFrame(OldFrameHdr,MaxFrameSize)||ValidFrame(NewFrameHdr,MaxFrameSize))
+      AllowNot=0;
+  if (AllowFix||AllowNot)
+    if (!StrictValidFrame(OldFrameHdr,MaxFrameSize))
+      AllowOld=0;
+  if (AllowOld||AllowNot)
+    if (!StrictValidFrame(NewFrameHdr,MaxFrameSize))
+      AllowFix=0;
+  if (AllowFix&&AllowOld)
+    if (NewOffset<Offset)
+      AllowOld=0;
+     else
+      AllowFix=0;
+  //Zwalniamy klatki
+  free(NewFrameHdr);
+  free(OldFrameHdr);
+  //I zwracamy co trzeba
+  if (AllowFix) return cbfFixedOffset;
+  if (AllowNot) return cbfNothing;
+  return cbfOldOffset;
+}
+
+void FillFramePosTable(ulong *&FramePosTable,int AnimFile,unsigned int &FrameCount,ulong FullFrameSize,int Options)
+/*
+  Szuka pocz¥tk¢w klatek i zapisuje je w tablicy.
+  Potrzebuje nie zwi©kszonej o 1 ilo˜ci klatek, wprost z nagˆ¢wka (FrameCount).
+  Zakˆada, ¾e jest w pliku na pozycji zaraz po nagˆ¢wku
+*/
+{
+  printf("Creating Frame-Position Table...\n");
+  if (Options & poFixFramePositions)
+    printf("*Frames position fixing active.\n");
+  //Zmienna pami©taj¥ca miejsce gdzie szukamy klatki
+  ulong Offset=tell(AnimFile);
+  ulong foundedFrames=0;
+  signed long InsResult=0;
+  //Uproszczone opcje, dla przegl¥dania pliku
+  int ParseOptions=(Options & (0xffff - poDisplayAllInfo)) | poIgnoreExceptions;
+  //Wyczy˜†my tablic©
+  ClearNBufferBytes((char *)FramePosTable,(FrameCount+2)*sizeof(ulong));
+  //Nagˆ¢wek klatki
+  FLIFrameHeader *AnimFrameHdr=(FLIFrameHeader *)AllocateMem(sizeof(FLIFrameHeader)+1,errCritical|errFrameHdr,Options);
+  //Teraz trzeba przegl¥da† kolejne klatki
+  while (Offset<filelength(AnimFile))
+    {
+    //Alternatywny offset pocz¥tku klatki
+    ulong fixedOffset=0;
+    //Do sprawdzenia czy nie nakˆadamy ni© na poprzedni trzeba dodatkow¥ zmienn¥, bo
+    //FramePosTable[lastFrame] musi by† zawsze zdefiniowane - po to tyle piepszenia
+    ulong lastFrame;
+    if (foundedFrames>0) lastFrame=foundedFrames-1; else lastFrame=0;
+    //Tablica jest wyczyszczona, wi©c w tym momencie FramePosTable[foundedFrames]=0
+    if (Options & poFixFramePositions) fixedOffset=FindBestPosition(FramePosTable,AnimFile,lastFrame,foundedFrames,Offset,ParseOptions);
+    //Teraz nale¾y wybra† kt¢ry˜ z nich, lub po prostu zwi©kszy† Offset i szuka† nast©pnego
+	if (Options & poDisplayAllInfo)
+	  printf("    Possible frame no %4lu, ",(ulong)foundedFrames+1);
+    switch (ChooseBestFrame(AnimFile,FullFrameSize+2*MaxPalSize+sizeof(FLIFrameHeader)+3*sizeof(FLIChunkHeader),Offset,fixedOffset,ParseOptions))
+      {
+      case cbfOldOffset:
+	{
+	printf("founded at expected offset %7lu, ",Offset);
+	LoadFrameHeader(AnimFile,AnimFrameHdr,Offset,0,0,ParseOptions);
+	InsResult=InsertFrameToTable(FramePosTable,FrameCount,foundedFrames,Offset);
+	Offset+=AnimFrameHdr->size;
+	break;
+	};
+      case cbfFixedOffset:
+	{
+	printf("founded at adjusted offset %7lu, ",fixedOffset);
+	LoadFrameHeader(AnimFile,AnimFrameHdr,fixedOffset,0,0,ParseOptions);
+	InsResult=InsertFrameToTable(FramePosTable,FrameCount,foundedFrames,fixedOffset);
+	Offset=fixedOffset+AnimFrameHdr->size;
+	break;
+	};
+      case cbfNothing:
+	{
+	printf("not founded near offset   %7lu, ",Offset);
+	Offset+=deltaRange;
+	InsResult=-255;
+	break;
+	};
+      default:
+	ShowError(errImpossible,"");
+      };
+    if (Options & poDisplayAllInfo)
+      {
+      if (InsResult==-255) printf("skipped.\n");
+       else
+      if (InsResult>0)  printf("added to frame table.\n");
+       else
+      if (InsResult==0) printf("already is in frame table.\n");
+       else
+      if (InsResult<0)  printf("cannot add, frame table full.\n");
+      };
+    };
+  if (foundedFrames<FrameCount+1)
+    {
+    if (Options & poUseFrameFinder)
+	{
+        //Wywoˆanie FrameFindera znajdzie pozostaˆe klatki
+	FindLostFrames(FramePosTable,AnimFile,FrameCount,foundedFrames,FullFrameSize,Options);
+        };
+    };
+  if (foundedFrames<FrameCount+1)
+    {
+    printf("-->Only %lu frames out of %lu founded. Frames count FIXED.\n",foundedFrames,(ulong)FrameCount+1);
+    }
+   else
+    printf("  All frames listed in table.\n");
+  FramePosTable[FrameCount+2]=filelength(AnimFile);
   free(AnimFrameHdr);
 }
 
-void SetRequiredOptions(ulong *FramePosTable,int AnimFile,ulong FrameCount,int &Options)
+void ParseFileToSetOptions(ulong *FramePosTable,int AnimFile,ulong FrameCount,int &Options)
 {
-  if (FrameCount>0)
+  printf("Parsing file to set optimal options...\n");
+  int ParseOptions=(Options & (0xffff - poDisplayAllInfo)) | poIgnoreExceptions;
+  int FirstFrameHasPalette=0;
+  int ExpandPalette=1;
+  //Robimy sobie pami©† na klatk© i nagˆ¢wek chunka
+  FLIFrameHeader *FrameHdr=(FLIFrameHeader *)malloc(sizeof(FLIFrameHeader)+1);
+  FLIChunkHeader *AnimChunkHdr=(FLIChunkHeader *)malloc(sizeof(FLIChunkHeader)+1);
+  if ((FrameHdr==NULL)||(AnimChunkHdr==NULL))
     {
-    FLIChunkHeader *AnimChunkHdr=(FLIChunkHeader *)malloc(sizeof(FLIChunkHeader)+1);
-    if (AnimChunkHdr==NULL) return;
-    LoadChunkHeader(AnimFile,AnimChunkHdr,FramePosTable[0]+sizeof(FLIFrameHeader),0,(Options & (0xffff - poDisplayAllInfo)) | poIgnoreExceptions);
-    if ((AnimChunkHdr->type!=FLI_COLOR)&&(AnimChunkHdr->type!=FLI_COLOR256))
+    ShowError(errMemAlloc,"Cannot allocate memory for parsing (to auto-configure). Options set do defaults.");
+    free(AnimChunkHdr);
+    free(FrameHdr);
+    return;
+    };
+  //i przegl¥damy kolejne klatki wraz z chunksami
+  for (ulong i=0;i<=FrameCount;i++)
+    {
+    //Klatka
+    LoadFrameHeader(AnimFile,FrameHdr,FramePosTable[i],i+1,FrameCount+1,ParseOptions);
+    FixFrameHeader(FrameHdr,FramePosTable[i],FramePosTable[i+1],ParseOptions);
+    //Teraz Chunksy
+    ulong ChunkStartOffs;
+    for (ulong k=0;k<(FrameHdr->chunks);k++)
       {
-      Options|=poRecostructPatette;
-      }
-     else
+      ChunkStartOffs=tell(AnimFile);
+      //Dopasowujeny offset Chunka
+      //!!!!AdjustChunkOffset(AnimFile,,,Options);
+      //Wczytujemy nagˆ¢wek chunka
+      LoadChunkHeader(AnimFile,AnimChunkHdr,ChunkStartOffs,k+1,ParseOptions);
+      FixChunkHeader(AnimChunkHdr,FramePosTable[i+1]-ChunkStartOffs,ParseOptions);
+      //Tworzymy bufor do wczytania zawarto˜ci
+      ulong DataSize=AnimChunkHdr->size-sizeof(FLIChunkHeader);
+      void *ChunkData=malloc(DataSize+2);
+      if (ChunkData==NULL)
+        {
+        ShowError(errChunkHdr|errMemAlloc,"Cannot allocate memory for chunk data when parsing. Options set to defaults - detection failed.");
+        free(AnimChunkHdr);
+        free(FrameHdr);
+        return;
+        };
+      //Wczytujemy zawarto˜† chunka
+      LoadChunkData(AnimFile,ChunkData,DataSize,ParseOptions);
+      FixChunkData(AnimChunkHdr,ChunkData,DataSize,ParseOptions);
+      /*
+      Czas by sprawdzi† co nam ten chunk da
+        Mamy: i - nr klatki         k - nr chunksa            FramePosTable[] - granice
+              AnimChunkHdr          ChunkData                 FrameHdr
+      */
+      //Opcja: czy dodawa† palet©
+      if ((i==0)&&((AnimChunkHdr->type==FLI_COLOR)||(AnimChunkHdr->type==FLI_COLOR256)))
+        FirstFrameHasPalette=1;
+      //Opcja: czy zmienia† typ palety
       if (AnimChunkHdr->type==FLI_COLOR256)
         {
-        //W takim wypadku trzeba sprawdzi†, czy nie mno¾y† palety *4
-        //Tworzymy bufor do wczytania zawarto˜ci chunka
-        ulong DataSize=AnimChunkHdr->size-sizeof(FLIChunkHeader);
-        void *ChunkData=malloc(DataSize+2);
-        if (ChunkData!=NULL)
+        if (!PalShallBeMultiplied(ChunkData,DataSize))
           {
-          //Wczytujemy
-          LoadChunkData(AnimFile,ChunkData,DataSize,Options);
-	  if (PalShallBeMultiplied((char *)ChunkData+sizeof(FLIColor256Header)))
-            Options|=poExpandPatette;
-          free(ChunkData);
+          //printf("Zrezygnowano z pal*4 po chunksie %lu z klatki %lu\n",k,i);
+          ExpandPalette=0;
           };
         };
-    free(AnimChunkHdr);
+      //Koniec Opcji - Zwalniamy pami©†
+      free(ChunkData);
+      };
     };
+  //Teraz mo¾emy spokojnie ustawi† wˆa˜ciwe opcje
+  if (!FirstFrameHasPalette)
+    {
+    printf("*Patette reconstruction from .PAL file activated.\n");
+    Options|=poRecostructPatette;
+    };
+  if ((FirstFrameHasPalette)&&(ExpandPalette))
+    {
+    printf("*Palette type indicator correction activated.\n");
+    Options|=poExpandPatette;
+    };
+
+  //To wszystko - jeszcze zwalniamy pami©†
+  free(AnimChunkHdr);
+  free(FrameHdr);
 }
 
 
 /*
 void AdjustChunkOffset(ulong ChunkPos,int AnimFile,ulong RangeStart,ulong RangeEnd,int Options)
 {
-  ulong Offset=tell(AnimFile);
-  FLIChunkHeader *AnimChunkHdr=(FLIChunkHeader *)malloc(sizeof(FLIChunkHeader)+1);
-  for (ulong n=0;n<=FrameCount;n++)
-    {
-    //Szukamy offsetu na kt¢rym jest ChunkHeader
-    ulong delta=0;
-    ulong lastDelta;
-    do
-      {
-      lastDelta=delta;
-      //delta ma by† ci¥giem: 0 -1 1 -2 2 -3 3 ....
-      if (delta>=0)
-	{ delta++; delta*=(-1); }
-       else
-	{ delta*=(-1); };
-      //Dla kolejnych delt pr¢bujemy wczytywa† ChunkHeader
-      if (((Offset-delta)>(sizeof(FLIMainHeader)-2)) && ((Offset-delta)<(filelength(AnimFile)-sizeof(FLIMainHeader)+2)))
-	LoadChunkHeader(AnimFile,AnimChunkHdr,Offset+lastDelta,Options | poIgnoreExceptions);
-       else
-	ClearFLIChunkHdr(AnimChunkHdr);
-      }
-     while ((!ValidChunk(AnimChunkHdr))&&(delta<65535));
-    //Tu mamy kandydata na Chunka - mo¾emy go zaakceptowa† lub nie
-    if (ValidChunk(AnimChunkHdr))
-      {
-      if ((n>0)&&((Offset+lastDelta)<FramePosTable[n-1]))
-	FramePosTable[n]=Offset;
-       else
-	FramePosTable[n]=Offset+lastDelta;
-      }
-     else
-      FramePosTable[n]=Offset;
-    //Ustawili˜my offset chunka. Trzeba sie przygotowac do kolejnych poszukiwaä
-    printf("Klatka numer %lu, offset wejsciowy %lu, delta %lu \n",n,Offset,lastDelta);
-    getch();
-    LoadChunkHeader(AnimFile,AnimChunkHdr,FramePosTable[n],Options | poIgnoreExceptions);
-    Offset=FramePosTable[n]+AnimChunkHdr->size;
-    };
-  free(AnimChunkHdr);
 }
 */
 
@@ -274,26 +484,49 @@ ulong ProcessChunk(int AnimFile,int DestFile,ulong ChunkPos,ulong MaxSize,ulong 
 {
   //Ustawienia i testy pocz¥tkowe
   ulong Increment=sizeof(FLIChunkHeader);
+  ulong DestLastChunkStart=tell(DestFile);
+  int ShallRemoveChunk=0;
 
   //Dopasowujeny offset Chunka
   //!!!!AdjustChunkOffset(AnimFile,,,Options);
 
-  //Wczytujemy jego nagˆ¢wek i zapisujemy przy okazji
-  FLIChunkHeader *AnimChunkHdr=(FLIChunkHeader *)malloc(sizeof(FLIChunkHeader)+1);
-  if (AnimChunkHdr==NULL) ShowError(errCritical|errChunkHdr|errMemAlloc,"Cannot allocate memory for chunk header. Try reboot your machine.");
-  LoadChunkHeader(AnimFile,AnimChunkHdr,ChunkPos,ChunkNum,Options);
-  FixChunkHeader(AnimChunkHdr,MaxSize,Options);
-  SaveData(AnimChunkHdr,sizeof(FLIChunkHeader),DestFile);
+  //Wczytujemy jego nagˆ¢wek
+  FLIChunkHeader *AnimChunkHdr=(FLIChunkHeader *)AllocateMem(sizeof(FLIChunkHeader)+1,errCritical|errChunkHdr,Options);
+  if (ChunkPos+sizeof(FLIChunkHeader) <= filelength(AnimFile))
+    LoadChunkHeader(AnimFile,AnimChunkHdr,ChunkPos,ChunkNum,Options);
+   else
+    {
+    ClearFLIChunkHdr(AnimChunkHdr);
+    ShallRemoveChunk=1;
+    };
+  //Zapami©tujemy czy chunk byˆ poprawny przed naprawieniem
+  if ((Options & poRemoveBadChunks)&&(!ShallRemoveChunk))
+    ShallRemoveChunk=(!ValidChunk(AnimChunkHdr,MaxSize));
+  if (Options & poFixChunkHeaders)
+    FixChunkHeader(AnimChunkHdr,MaxSize,Options);
 
   //Tworzymy bufor do wczytania zawarto˜ci
   ulong DataSize=AnimChunkHdr->size-sizeof(FLIChunkHeader);
-  void *ChunkData=malloc(DataSize+2);
-  if (ChunkData==NULL) ShowError(errCritical|errChunkHdr|errMemAlloc,"Cannot allocate memory for chunk data. Chunk is too big?");
+  void *ChunkData=AllocateMem(DataSize+2,errCritical|errChunkData,Options);
 
-  //Wczytujemy i zapisujemy
+  //Wczytujemy zawarto˜† chunka
   LoadChunkData(AnimFile,ChunkData,DataSize,Options);
-  FixChunkData(AnimChunkHdr,(char *)ChunkData,Options);
-  SaveData(ChunkData,DataSize,DestFile);
+  FixChunkData(AnimChunkHdr,ChunkData,DataSize,Options);
+
+if ( (Options & poRemoveBadChunks) &&
+     ((!ValidChunkData(AnimChunkHdr->type,ChunkData,DataSize))||ShallRemoveChunk) )
+    {
+    Increment=0;
+//    if ((Options & poDisplayAllInfo))
+      printf("-->Chunk no %lu looks suspicious - REMOVED\n",ChunkNum);
+    }
+   else
+    {
+    //Zapisujemy i urealniamy
+    SaveDataToFile(AnimChunkHdr,sizeof(FLIChunkHeader),DestFile);
+    SaveDataToFile(ChunkData,DataSize,DestFile);
+    RewriteChunkHeader(DestFile,DestLastChunkStart,AnimChunkHdr);
+    };
 
   //Zwalniamy pami©†
   free(ChunkData);
@@ -304,73 +537,133 @@ ulong ProcessChunk(int AnimFile,int DestFile,ulong ChunkPos,ulong MaxSize,ulong 
 void ProcessFrameChunks(int AnimFile,int DestFile,FLIFrameHeader *FrameHdr,ulong CountedPos,ulong FrameEnd,int Options)
 {
   ulong ChunkStartOffs=0;
+  ulong RealChunksNumber=0;
+  ulong ChunkSize;
   for (ulong k=0;k<(FrameHdr->chunks);k++)
     {
     if (Options & poManualSeeking)
       ChunkStartOffs=CountedPos;
      else
       ChunkStartOffs=tell(AnimFile);
-    CountedPos+=ProcessChunk(AnimFile,DestFile,ChunkStartOffs,FrameEnd-ChunkStartOffs,k,Options);
+    ChunkSize=ProcessChunk(AnimFile,DestFile,ChunkStartOffs,FrameEnd-ChunkStartOffs,k+1,Options);
+    if (ChunkSize>0)
+      {
+      CountedPos+=ChunkSize;
+      RealChunksNumber++;
+      };
     //printf(">>Pozycje: AnimFile %lu DestFile %lu\n",tell(AnimFile),tell(DestFile));
     };
   //Niekt¢re klatki wymagaj¥ drobnej korekcji
+  FrameHdr->chunks=RealChunksNumber;
   if ((FrameHdr->chunks>1)&&((FrameHdr->size%2)>0))
     {
     lseek(DestFile,-1 ,SEEK_CUR);
     };
 }
 
-void ProcessFLIFile(int AnimFile,int DestFile)
+void ProcessFLISimple(int AnimFile,int DestFile,ulong StartFrame,ulong EndFrame,int &Options)
+/*
+  Wersja uproszczona ProcessFLIFile - do test¢w
+*/
+{
+  ulong CountedPos=0;//Ten parametr jest u¾ywany do ManualSeeking
+
+  //Przetwarzamy nagˆ¢wek
+  FLIMainHeader *AnimMainHeader=(FLIMainHeader *)AllocateMem(sizeof(FLIMainHeader)+1,errCritical|errMainHdr,Options);
+  CountedPos+=ProcessMainHeader(AnimFile,DestFile,AnimMainHeader,Options);
+
+  //Po prostu przepisujemy zawarto˜† pliku do DestFile
+  ulong BufSize=4096;
+  void *Buf=AllocateMem(BufSize+1,errPlainData|errCritical,Options);
+  unsigned int nRead=1;
+  while (nRead!=0)
+    {
+    nRead=read(AnimFile,Buf,BufSize);
+    if (nRead!=0)
+      SaveDataToFile(Buf,nRead,DestFile);
+    };
+  //Na koniec poprawiamy MainHeader
+  if (StartFrame>AnimMainHeader->frames) StartFrame=AnimMainHeader->frames;
+  if (EndFrame>AnimMainHeader->frames) EndFrame=AnimMainHeader->frames;
+  if (StartFrame>EndFrame) EndFrame=StartFrame;
+  RewriteMainHeader(DestFile,EndFrame-StartFrame,AnimMainHeader);
+
+  //To wszystko - jeszcze zwalniamy pami©†
+  free(AnimMainHeader);
+}
+
+void ProcessFLIFile(int AnimFile,int DestFile,ulong StartFrame,ulong EndFrame)
 /*
   Czyta wcze˜niej otwarty AnimFile i przepisuje
   do wcze˜niej otwartego DestFile
 */
 {
   ulong CountedPos=0;//Ten parametr jest u¾ywany do ManualSeeking
-  ulong FrameCount=0;
+  ulong DestLastFramePos=0;
 
   //Przetwarzamy nagˆ¢wek
-  CountedPos+=ProcessMainHeader(AnimFile,DestFile,FrameCount,Options);
-  AskToDisplayInfo(Options);
+  FLIMainHeader *AnimMainHeader=(FLIMainHeader *)AllocateMem(sizeof(FLIMainHeader)+1,errCritical|errMainHdr,Options);
+  CountedPos+=ProcessMainHeader(AnimFile,DestFile,AnimMainHeader,Options);
 
   //Robimy tablic© poˆorzeä klatek
-  ulong *FramePosTable=(ulong *)malloc(sizeof(ulong)*(FrameCount+2));
-  if (FramePosTable==NULL) ShowError(errCritical|errFrameHdr|errMemAlloc,"Cannot allocate memory for frame-position table. Frames count too high.");
-  FillFramePosTable(FramePosTable,AnimFile,FrameCount,Options);
-  SetRequiredOptions(FramePosTable,AnimFile,FrameCount,Options);
-  FLIFrameHeader *FrameHdr=(FLIFrameHeader *)malloc(sizeof(FLIFrameHeader)+1);
-  if (FrameHdr==NULL) ShowError(errCritical|errFrameHdr|errMemAlloc,"Cannot allocate memory for frame header. Frames count too high?");
+  ulong *FramePosTable=(ulong *)AllocateMem(sizeof(ulong)*(AnimMainHeader->frames+3),errCritical|errFramePosTbl,Options);
+  FillFramePosTable(FramePosTable,AnimFile,AnimMainHeader->frames,AnimMainHeader->width*AnimMainHeader->height,Options);
+  ParseFileToSetOptions(FramePosTable,AnimFile,AnimMainHeader->frames,Options);
+  FLIFrameHeader *FrameHdr=(FLIFrameHeader *)AllocateMem(sizeof(FLIFrameHeader)+1,errCritical|errFramePosTbl,Options);
 
   //i przetwarzamy kolejne klatki wraz z chunksami
-  for (ulong i=0;i<=FrameCount;i++)
+  if (StartFrame>AnimMainHeader->frames) StartFrame=AnimMainHeader->frames;
+  if (EndFrame>AnimMainHeader->frames) EndFrame=AnimMainHeader->frames;
+  if (StartFrame>EndFrame) EndFrame=StartFrame;
+  for (ulong i=StartFrame;i<=EndFrame;i++)
     {
-    CountedPos+=ProcessFrame(AnimFile,DestFile,FrameHdr,FramePosTable[i],FramePosTable[i+1],i+1,FrameCount+1,Options);
+    DestLastFramePos=tell(DestFile);
+    CountedPos+=ProcessFrame(AnimFile,DestFile,FrameHdr,FramePosTable[i],FramePosTable[i+1],i+1,AnimMainHeader->frames+1,Options);
     ProcessFrameChunks(AnimFile,DestFile,FrameHdr,CountedPos,FramePosTable[i+1],Options);
+    RewriteFrameHeader(DestFile,DestLastFramePos,i+1,FrameHdr,Options);
     WaitForKeypress(Options);
     };
 
+  //Na koniec poprawiamy MainHeader
+  RewriteMainHeader(DestFile,EndFrame-StartFrame,AnimMainHeader);
+
   //To wszystko - jeszcze zwalniamy pami©†
+  free(AnimMainHeader);
   free(FrameHdr);
   free(FramePosTable);
 }
 
 int main(int argc, char *argv[])
 {
-  //Otwieramy pliki
+  //Inicjujemy zmienne
   int AnimFile;
   int DestFile;
+  //Klatki numerujemy od 0
+  ulong StartFrame=0;
+  ulong EndFrame=MAXLONG;
+  //Opis opcji jest w pliku z definicj¥ ich typu
+  Options=poDisplayAllInfo|poFixMainHeader|poRemoveBadChunks|
+          poFixFramePositions|poUseFrameFinder|poFixFrameHeaders;
+  Options|=poRemoveBadChunks|poFixChunkHeaders|poNeverWaitForKey;
+  //
+  //Options=poSimpleFix;
+  //Powitanie
   SayHello();
+
+  //Tu powinna by† analiza parametr¢w wej˜ciowych
   if (argc<2) ShowError(errFileOpen+errCritical,"U did not specified source FLI filename.");
+//  StartFrame=622;
+//  EndFrame=9999;
+
+  //Otwieramy pliki
   OpenFLIFile(argv[1],AnimFile,O_RDONLY);
   OpenFLIFile(DestFName,DestFile,O_RDWR|O_CREAT|O_TRUNC);
 
-  //Inicjujemy zmienne pocz¥tkowe
-  Options=0;
-  //Opcja !poManualSeeking znaczy brak seekingu (leci po kolei w pliku)
-  //Opcja !poDisplayAllInfo znaczy nie zatrzymywanie si© i nie wy˜wietlanie info
-
   //Analizujemy plik
-  ProcessFLIFile(AnimFile,DestFile);
+  if (Options & poSimpleFix)
+    ProcessFLISimple(AnimFile,DestFile,StartFrame,EndFrame,Options);
+   else
+    ProcessFLIFile(AnimFile,DestFile,StartFrame,EndFrame);
 
   //No i zamykamy
   CloseFLIFiles(AnimFile,DestFile);
