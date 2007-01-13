@@ -1,9 +1,15 @@
 /*
     FLI Filetype declaration
-    (c) 2004 Tomasz Lis
+    written by Tomasz Lis, Gdansk, Poland 2004-2006
+    this software is under GNU license
 */
-#if !defined( __FLIFile_H )
+#ifndef __FLIFile_H
 #define __FLIFile_H
+
+#ifdef __BORLANDC__
+#else
+#include <stdint.h>
+#endif
 
 #include "PrgTools.h"
 
@@ -21,58 +27,70 @@ enum ChunkType
 
 typedef struct
   {
-     ulong size;
-     unsigned int magic;
-     unsigned int frames;
-     unsigned int width;
-     unsigned int  height;
+     uint32_t size;
+     uint16_t magic;
+     uint16_t frames;
+     uint16_t width;
+     uint16_t height;
   } FLIMainHeader;
 
+#define sizeof_FLIMainHeader 12
+
 typedef struct
   {
-     unsigned int depth;
-     unsigned int flags;
-     unsigned int speed;
-     ulong next;
-     ulong frit;
-     //Wa¾ne mineˆy - tu s¥ pierdoˆy (offset 26 dec)
-     ulong creator;
-     ulong lastchange;
-     ulong changerserial;
-     unsigned int Xaspec;
-     unsigned int Yaspec;
-     unsigned int reserved1[19];
-     ulong frame1;
-     ulong frame2;
-     unsigned int reserved2[20];
+     uint16_t depth;
+     uint16_t flags;
+     uint16_t speed;
+     uint32_t next;
+     uint32_t frit;
+     //End of importand stuff - irrelevant stuff here (offset 26 dec)
+     uint32_t creator;
+     uint32_t lastchange;
+     uint32_t changerserial;
+     uint16_t Xaspec;
+     uint16_t Yaspec;
+     uint16_t reserved1[19];
+     uint32_t frame1;
+     uint32_t frame2;
+     uint16_t reserved2[20];
   } FLIAddHeader;
+//####
+#define sizeof_FLIAddHeader 116
 
-const ulong FLIFrameExpandSize=4;
+#define FLIFrameExpandSize 4
 
 typedef struct
   {
-     ulong size;
-     unsigned int magic;
-     unsigned int chunks;
-     unsigned int expand[FLIFrameExpandSize];
+     uint32_t size;
+     uint16_t magic;
+     uint16_t chunks;
+     uint16_t expand[FLIFrameExpandSize];
   } FLIFrameHeader;
 
-typedef struct
-  {
-     ulong size;
-     unsigned int type;
-  } FLIChunkHeader;
+#define sizeof_FLIFrameHeader 16
 
 typedef struct
   {
-     unsigned int nPackets;
+     uint32_t size;
+     uint16_t type;
+  } FLIChunkHeader;
+//####
+#define sizeof_FLIChunkHeader 6
+
+typedef struct
+  {
+     uint16_t nPackets;
   } FLIColorHeader;
+
+#define sizeof_FLIColorHeader 2
 
 typedef struct
   {
      unsigned char nSkipColors;
      unsigned char nChangeColors; //If this number is 0,  (zero), it means 256
   } FLIColorPacketHeader;
+
+#define sizeof_FLIColorPacketHeader 2
 
 typedef struct
   {
@@ -81,29 +99,47 @@ typedef struct
      unsigned char Blue;
   } ColorDefinition;
 
-const ulong MaxPalSize=sizeof(FLIChunkHeader)+sizeof(FLIColorHeader)+6*sizeof(FLIColorPacketHeader)+256*sizeof(ColorDefinition);
+#define sizeof_ColorDefinition 3
 
+#define MaxPalSize sizeof_FLIChunkHeader+sizeof_FLIColorHeader+6*sizeof_FLIColorPacketHeader+256*sizeof_ColorDefinition
 
-//Funkcje
-char *GetChunkTypeStr(int iType);
-void DisplayAddHeaderInfo(FLIAddHeader *AnimAddHeader,ulong HEnd);
-void DisplayFrameInfo(FLIFrameHeader *CurrFrameHdr,ulong FrameNumber,ulong TotalFrames,ulong HStart,ulong HEnd);
-void DisplayChunkInfo(FLIChunkHeader *CurrChunkHdr,ulong ChunkNumber,ulong HStart);
+#define MaxAnimWidth 1024
+#define MaxAnimHeight 768
 
-void ClearFLIChunkHdr(FLIChunkHeader *HdrPtr);
-void ClearFLIFrameHdr(FLIFrameHeader *HdrPtr);
-void ClearFLIAddHdr(FLIAddHeader *HdrPtr);
-void FLIAddHdrDefaults(FLIAddHeader *HdrPtr);
-
-int HasAddHeader(FLIMainHeader *AnimHeader);
-void LoadMainHeader(FLIMainHeader *AnimHeader,FLIAddHeader *AnimAddHeader,int AnimFile,int Options);
-void LoadFrameHeader(int AnimFile,FLIFrameHeader *AnimFrameHdr,ulong StartOffset,ulong CurrFrame,ulong TotalFrames,int Options);
-void LoadChunkHeader(int AnimFile,FLIChunkHeader *AnimChunkHdr,ulong StartOffset,ulong ChunkNumber,int Options);
-void LoadChunkData(int AnimFile,void *AnimChunkData,ulong Size,int Options);
-
-int ValidChunk(FLIChunkHeader *AnimChunkHdr,ulong);
-int ValidFrame(FLIFrameHeader *AnimFrameHdr,ulong);
-void FixMainHeader(FLIMainHeader *AnimHeaderSrc,FLIAddHeader *AnimAddHeaderSrc,FLIMainHeader *AnimHeaderDest,FLIAddHeader *AnimAddHeaderDest,ulong FSize,int Options);
-void FixFrameHeader(FLIFrameHeader *AnimFrameHdr,ulong FramePos,ulong FrameEnd,int Options);
+//Functions
+char *getChunkTypeStr(unsigned int iType);
+void displayMainHeaderInfo(FLIMainHeader *animHeader,ulong hStart, ulong fSize);
+void displayAddHeaderInfo(FLIAddHeader *animAddHeader,ulong hEnd);
+void displayFrameInfo(FLIFrameHeader *currFrameHdr,ulong frameNumber,ulong totalFrames,ulong hStart,ulong hEnd);
+void displayChunkInfo(FLIChunkHeader *currChunkHdr,ulong chunkNumber,ulong hStart);
+//Clearing structures
+void clearNBufferBytes(char *buf,ulong N);
+void clearFLIChunkHdr(FLIChunkHeader *hdrPtr);
+void clearFLIFrameHdr(FLIFrameHeader *hdrPtr);
+void clearFLIAddHdr(FLIAddHeader *hdrPtr);
+void setFLIAddHdrDefaults(FLIAddHeader *hdrPtr);
+//Reading structures
+int hasAddHeader(FLIMainHeader *animHeader);
+void loadMainHeader(FLIMainHeader *animHeader,FLIAddHeader *animAddHeader,FILE *animFile,int options);
+void loadFrameHeader(FILE *animFile,FLIFrameHeader *animFrameHdr,ulong startOffset,ulong currFrame,ulong totalFrames,int options);
+void loadChunkHeader(FILE *animFile,FLIChunkHeader *animChunkHdr,ulong startOffset,ulong chunkNumber,int options);
+void loadChunkData(FILE *animFile,void *animChunkData,ulong size,int options);
+//Fixing structures
+int validChunk(FLIChunkHeader *animChunkHdr,ulong maxChunkSize);
+int validColor(void *chunkData,ulong dataSize);
+int validChunkData(unsigned int type,void *chunkData,ulong dataSize);
+int strictValidFrame(FLIFrameHeader *animFrameHdr,ulong maxLength);
+int validFrame(FLIFrameHeader *animFrameHdr,ulong maxLength);
+int palShallBeMultiplied(void *palData,ulong dataSize);
+void fixMainHeader(FLIMainHeader *animHeaderSrc,FLIAddHeader *animAddHeaderSrc,FLIMainHeader *animHeaderDest,FLIAddHeader *animAddHeaderDest,ulong fSize,int options);
+void fixFrameHeader(FLIFrameHeader *animFrameHdr,ulong framePos,ulong frameEnd,int options);
+void fixChunkHeader(FLIChunkHeader *animChunkHdr,ulong maxSize,ulong chunkNum,int isLastFrame,int options);
+void fixChunkData(FLIChunkHeader *animChunkHdr,void *chunkData,ulong *dataSize,int options);
+void fixFrameHdrToAddChunks(FLIFrameHeader *animFrameHdr,ulong frameNum,int options);
+//Writing structures
+void rewriteChunkHeader(FILE *destFile,ulong destLastChunkStart,FLIChunkHeader *chunkHdr);
+void rewriteFrameHeader(FILE *destFile,ulong destLastFramePos,ulong frameNum,FLIFrameHeader *frameHdr,int options);
+void rewriteMainHeader(FILE *destFile,ulong nFrames,FLIMainHeader *mainHdr);
+void addRequiredChunksAtFrameStart(FILE *destFile,ulong frameNumber,int options);
 
 #endif	// __FLIFile_H

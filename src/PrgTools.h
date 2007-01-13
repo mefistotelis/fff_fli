@@ -1,8 +1,9 @@
 /*
     Program tool structures
-    (c) 2004 Tomasz Lis
+    written by Tomasz Lis, Gdansk, Poland 2004-2006
+    this software is under GNU license
 */
-#if !defined( __PrgTools_H )
+#ifndef __PrgTools_H
 #define __PrgTools_H
 
 #include <stdio.h>
@@ -34,26 +35,25 @@ enum ProgError
 
 enum ProgOptions
     {
-    poManualSeeking=     0x0001,//Alternatywna metoda szukania poˆo¾eä w plikach
-    poDisplayAllInfo=    0x0002,//Wy˜wietla mn¢stwo tekst¢w informacyjnych
-    poExpandPatette=     0x0004,//Opcja wewnetrzna - powoduje zmiane typu palet COLOR256 na COLOR
-    poRecostructPatette= 0x0008,//Opcja wewn©trzna - wˆ¥cza si© gdy w 1 klatce nie ma definicji palety kolor¢w
-    poFixMainHeader=     0x0010,//Okre˜la czy MainHeader b©dzie "urzeczywistniany"
-    poFixFramePositions= 0x0020,//Okre˜la, czy pozycje klatek maj¥ by† dopasowywane przez szukanie ich w pliku
-    poUseFrameFinder=    0x0040,//FrameFinder to funkcja szukaj¥ca klatek, gdy znaleziono ich zbyt maˆo
-    poFixFrameHeaders=   0x0080,//Bez tego funkcja naprawiaj¥ca sie sama koäczy
-    poRadicalFrameHdrFix=0x0100,//zwi©ksza rygor poprawiania FrameHeaders
-    poRemoveBadChunks=   0x0200,//Jak z chunksem jest co˜ nie tak, to go wywala
-    poFixChunkHeaders=   0x0400,//Okre˜la czy chunksy maj¥ by† poprawiane
-    poSimpleFix=         0x0800,//Do test¢w - program naprawia tylko nagˆ¢wek, reszt© kopiuje
-    poNeverWaitForKey=   0x1000,//Nigdy nie prosi o naci˜ni©cie klawisza
-    poIgnoreExceptions=  0x2000,//do wewn©trznego urzycia, nie pokazuje bˆ©d¢w gdy wyst©puj¥
-    poNeverSkipFrames=   0x4000 //klatki «le wygl¥daj¥ce nie s¥ odrzucane
+    poManualSeeking=     0x0001,//Alternate method of getting offsets in files
+    poDisplayAllInfo=    0x0002,//Displays a lot of informatons - highly verbose mode
+    poExpandPatette=     0x0004,//Internal-set option - changes palette types COLOR256 to COLOR
+    poRecostructPatette= 0x0008,//Internal-set option - it enables when frame 1 has no color palette definition
+    poFixMainHeader=     0x0010,//Determines if MainHeader will be corrected to real values
+    poFixFramePositions= 0x0020,//Determines if frame positions should be adjusted by searching the file around given offset
+    poUseFrameFinder=    0x0040,//FrameFinder allows to search for frames in file if on first parsing not all of them has been found
+    poFixFrameHeaders=   0x0080,//Without this option, frame repair function just ends itself
+    poRadicalFrameHdrFix=0x0100,//It decreases the range of values in FrameHeaders whitch are assumed proper
+    poRemoveBadChunks=   0x0200,//If chunk seems to be destroyed, it is removed
+    poFixChunkHeaders=   0x0400,//Determines if chunk headers should be corrected
+    poSimpleFix=         0x0800,//For tests - only header is fixed, other data only copied
+    poNeverWaitForKey=   0x1000,//Never asks for pressing a key to continue
+    poIgnoreExceptions=  0x2000,//Internal-use option - will not show errors when they occure
+    poNeverSkipFrames=   0x4000 //With this option, frames witch looks bad won't be removed
     };
 
-const int
-  kbEnter     = 0x0d,
-  kbEscape    = 27;
+#define kbEnter 0x0d
+#define kbEscape 27
 
 typedef struct
   {
@@ -63,13 +63,14 @@ typedef struct
 
 //No i funkcje
 
-long filesize(FILE *stream);
-void ShowError(int ErrNum,char ErrText[]);
-void LoadPalette(char *FName,void *Buf,ulong BufSize,int Options);
-void SaveBlockToNewFile(const char *FName,void *Buf,ulong BufSize);
-void SaveDataToFile(void *BufDest,ulong Size,int DestFile);
-int LoadDataFromFile(int File,void *Buf,ulong BytesToRead,int ErrNum,int Options);
-void *AllocateMem(ulong Size,int ErrNum,int Options);
+long filesize(FILE *fp);
+void showError(int ErrNum,char ErrText[]);
+void loadPalette(char *FName,void *Buf,ulong BufSize,int Options);
+void saveBlockToNewFile(const char *FName,void *Buf,ulong BufSize);
+void saveDataToFile(void *BufDest,ulong Size,FILE *DestFile);
+int loadDataFromFile(FILE *File,void *Buf,ulong BytesToRead,int ErrNum,int Options);
+void *allocateMem(ulong buffer_size,int ErrNum,int mem_clear,int Options);
+
 
 
 #endif	// __PrgTools_H
