@@ -1,6 +1,6 @@
 /*
     Program tool functions
-    written by Tomasz Lis, Gdansk, Poland 2004-2006
+    written by Tomasz Lis, Gdansk, Poland 2004-2007
     this software is under GNU license
 */
 #ifndef __PrgTools_Cpp
@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
 #include "PrgTools.h"
 
 long filesize(FILE *fp)
@@ -99,8 +100,9 @@ if (ErrNum & errCritical)
   };
 }
 
+/** Reads palette file, allocates buffer and returns it
+ */
 void loadPalette(char *pal_file_name,void *palette_buffer,ulong BufSize,int Options)
-//Reads palette file, allocates buffer and returns it
 {
     FILE *palfp;
     palfp = fopen (pal_file_name, "rb");
@@ -129,10 +131,10 @@ void saveDataToFile(void *BufDest,ulong Size,FILE *DestFile)
   if (nWritten<Size) showError(errFileWrite+errCritical,strerror(errno));
 }
 
-int loadDataFromFile(FILE *File,void *Buf,ulong BytesToRead,int ErrNum,int Options)
-/*
+/**
  Reads BytesToRead from file to the preallocated buffer.
 */
+int loadDataFromFile(FILE *File,void *Buf,ulong BytesToRead,int ErrNum,int Options)
 {
   if (BytesToRead==0) return 1;
   unsigned int ReadOK=fread(Buf,1,BytesToRead,File);

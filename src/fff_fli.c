@@ -1,12 +1,10 @@
-//#include <cstdlib.h>
-//#include <iostream.h>
 #include <io.h>
 #include <stdio.h>
 #include <conio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <FCNTL.H>
-#include <SYS\STAT.H>
+#include <fcntl.h>
+#include <sys\stat.h>
 #include <mem.h>
 #include <limits.h>
 #include "PrgTools.h"
@@ -21,7 +19,7 @@ void sayHello()
   printf("\nAutodesk Animator FLI files fixer");
   printf("\n-------------------------------\n");
   printf("\nThis program can repair damaged or modified FLI files.\n");
-  printf("%20s written by Tomasz Lis, Gdansk, Poland 2004-2006\n","");
+  printf("%20s written by Tomasz Lis, Gdansk, Poland 2004-2007\n","");
   printf("%20s this software is under GNU license.\n\n","");
 }
 
@@ -29,7 +27,7 @@ void showUsage(char *addText)
 {
   printf("\n\n%s\n",addText);
   printf("\nUsage:\n");
-  printf("%8s flifix [options] <srcFile> [destFile]\n","");
+  printf("%8s fff_fli [options] <srcFile> [destFile]\n","");
   printf("\nWhere:\n");
   printf("  <srcFile>  is a FLI file to fix\n");
   printf("  [destFile] is an output file, set to '%s', if no other name typed\n",DefDestFName);

@@ -1,6 +1,7 @@
+File Format Fixer:
 Autodesk Animator FLI files fixer
 ------------------------------
-    written by Tomasz Lis, Gdansk, Poland 2004-2006
+    written by Tomasz Lis, Gdansk, Poland 2004-2007
     this software is under GNU license
 
 This little tool can analyze FLI file headers and fix
@@ -18,7 +19,7 @@ This program fixes all headers, but animation data
  is not changed. It means that after using this tool,
  there is still a chance that file has errors.
 
-Usage:  flifix [options] <srcFile> [destFile]
+Usage:  fff_fli [options] <srcFile> [destFile]
 
 Where
   <srcFile>  is a FLI file to fix
@@ -64,10 +65,10 @@ Options:
 
 Example of executing program to fix Syndicate FLI file:
 (file must be decompressed with DERNC first)
-flifix -v -m -f -p -n -b -c -a mendlose.dat mendlosefix.fli
+fff_fli -v -m -f -p -n -b -c -a mendlose.dat mendlosefix.fli
 
 Example of executing program to fix Syndicate Wars FLI file:
-flifix -v -m -f -p -n -b -c -a mod-01.fli mod-01fix.fli
+fff_fli -v -m -f -p -n -b -c -a mod-01.fli mod-01fix.fli
 
 If you don't know whitch options to use, try those from example.
 If you run program without options, just filename, it will not
@@ -76,8 +77,6 @@ If you run program without options, just filename, it will not
 If the program won't find palette information in first frame of animation,
  it will load palette from FLIFix.pal file.
 
-The source code files comes with Dev-C++ project files, so you can
- easily rebuild the source using Dev-C++ IDE. 
 
 
 Version: 1.02

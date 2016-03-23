@@ -1,6 +1,6 @@
 /*
     Program tool structures
-    written by Tomasz Lis, Gdansk, Poland 2004-2006
+    written by Tomasz Lis, Gdansk, Poland 2004-2007
     this software is under GNU license
 */
 #ifndef __PrgTools_H
@@ -35,21 +35,21 @@ enum ProgError
 
 enum ProgOptions
     {
-    poManualSeeking=     0x0001,//Alternate method of getting offsets in files
-    poDisplayAllInfo=    0x0002,//Displays a lot of informatons - highly verbose mode
-    poExpandPatette=     0x0004,//Internal-set option - changes palette types COLOR256 to COLOR
-    poRecostructPatette= 0x0008,//Internal-set option - it enables when frame 1 has no color palette definition
-    poFixMainHeader=     0x0010,//Determines if MainHeader will be corrected to real values
-    poFixFramePositions= 0x0020,//Determines if frame positions should be adjusted by searching the file around given offset
-    poUseFrameFinder=    0x0040,//FrameFinder allows to search for frames in file if on first parsing not all of them has been found
-    poFixFrameHeaders=   0x0080,//Without this option, frame repair function just ends itself
-    poRadicalFrameHdrFix=0x0100,//It decreases the range of values in FrameHeaders whitch are assumed proper
-    poRemoveBadChunks=   0x0200,//If chunk seems to be destroyed, it is removed
-    poFixChunkHeaders=   0x0400,//Determines if chunk headers should be corrected
-    poSimpleFix=         0x0800,//For tests - only header is fixed, other data only copied
-    poNeverWaitForKey=   0x1000,//Never asks for pressing a key to continue
-    poIgnoreExceptions=  0x2000,//Internal-use option - will not show errors when they occure
-    poNeverSkipFrames=   0x4000 //With this option, frames witch looks bad won't be removed
+    poManualSeeking=     0x0001,//< Alternate method of getting offsets in files
+    poDisplayAllInfo=    0x0002,//< Displays a lot of informatons - highly verbose mode
+    poExpandPatette=     0x0004,//< Internal-set option - changes palette types COLOR256 to COLOR
+    poRecostructPatette= 0x0008,//< Internal-set option - it enables when frame 1 has no color palette definition
+    poFixMainHeader=     0x0010,//< Determines if MainHeader will be corrected to real values
+    poFixFramePositions= 0x0020,//< Determines if frame positions should be adjusted by searching the file around given offset
+    poUseFrameFinder=    0x0040,//< FrameFinder allows to search for frames in file if on first parsing not all of them has been found
+    poFixFrameHeaders=   0x0080,//< Without this option, frame repair function just ends itself
+    poRadicalFrameHdrFix=0x0100,//< It decreases the range of values in FrameHeaders whitch are assumed proper
+    poRemoveBadChunks=   0x0200,//< If chunk seems to be destroyed, it is removed
+    poFixChunkHeaders=   0x0400,//< Determines if chunk headers should be corrected
+    poSimpleFix=         0x0800,//< For tests - only header is fixed, other data only copied
+    poNeverWaitForKey=   0x1000,//< Never asks for pressing a key to continue
+    poIgnoreExceptions=  0x2000,//< Internal-use option - will not show errors when they occure
+    poNeverSkipFrames=   0x4000 //< With this option, frames witch looks bad won't be removed
     };
 
 #define kbEnter 0x0d
@@ -61,7 +61,7 @@ typedef struct
      unsigned int high;
   } longAsInt;
 
-//No i funkcje
+// Functions
 
 long filesize(FILE *fp);
 void showError(int ErrNum,char ErrText[]);

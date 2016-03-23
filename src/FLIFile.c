@@ -1,6 +1,6 @@
 /*
     FLI Filetype functions
-    written by Tomasz Lis, Gdansk, Poland 2004-2006
+    written by Tomasz Lis, Gdansk, Poland 2004-2007
     this software is under GNU license
 */
 #ifndef __FLIFile_Cpp
@@ -10,12 +10,7 @@
 #include <stdlib.h>
 #include <conio.h>
 #include <io.h>
-#ifdef __BORLANDC__
-#include <values.h>
-#else
 #include <limits.h>
-#define MAXLONG LONG_MAX
-#endif
 #include "FLIFile.h"
 
 

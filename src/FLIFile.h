@@ -1,15 +1,12 @@
 /*
     FLI Filetype declaration
-    written by Tomasz Lis, Gdansk, Poland 2004-2006
+    written by Tomasz Lis, Gdansk, Poland 2004-2007
     this software is under GNU license
 */
 #ifndef __FLIFile_H
 #define __FLIFile_H
 
-#ifdef __BORLANDC__
-#else
 #include <stdint.h>
-#endif
 
 #include "PrgTools.h"
 
